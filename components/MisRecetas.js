@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { fmt } from '@/lib/currencies'
+import DetalleReceta from './DetalleReceta'
 
 export default function MisRecetas({ currency }) {
   const [recetas, setRecetas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [seleccionada, setSeleccionada] = useState(null)
 
   useEffect(() => { fetchRecetas() }, [])
 
@@ -19,7 +21,23 @@ export default function MisRecetas({ currency }) {
   async function eliminar(id) {
     await supabase.from('recetas').delete().eq('id', id)
     setRecetas(prev => prev.filter(r => r.id !== id))
+    setSeleccionada(null)
   }
+
+  function handleActualizada(recetaActualizada) {
+    setRecetas(prev => prev.map(r => r.id === recetaActualizada.id ? recetaActualizada : r))
+    setSeleccionada(recetaActualizada)
+  }
+
+  if (seleccionada) return (
+    <DetalleReceta
+      receta={seleccionada}
+      currency={currency}
+      onVolver={() => setSeleccionada(null)}
+      onEliminar={eliminar}
+      onActualizada={handleActualizada}
+    />
+  )
 
   if (loading) return <p style={{ color:'#888', fontSize:'14px' }}>Cargando...</p>
 
@@ -34,7 +52,10 @@ export default function MisRecetas({ currency }) {
       {recetas.map(r => (
         <div key={r.id} style={card}>
           <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-            <span style={{ flex:1, fontSize:'15px', fontWeight:'500' }}>{r.nombre}</span>
+            <button onClick={() => setSeleccionada(r)}
+              style={{ flex:1, textAlign:'left', fontSize:'15px', fontWeight:'500', background:'none', border:'none', cursor:'pointer', color:'#1D9E75', padding:0 }}>
+              {r.nombre}
+            </button>
             <span style={tag}>{r.categoria}</span>
             <span style={{ fontSize:'12px', color:'#888' }}>{r.porciones} porciones</span>
             <button onClick={() => eliminar(r.id)} style={btnDanger}>eliminar</button>

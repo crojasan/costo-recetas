@@ -11,6 +11,7 @@ export default function Ingredientes({ currency }) {
   const { user } = useAuth()
   const [ingredientes, setIngredientes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [editando, setEditando] = useState(null)
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState(CATEGORIAS[0])
   const [precio, setPrecio] = useState('')
@@ -27,16 +28,31 @@ export default function Ingredientes({ currency }) {
     setLoading(false)
   }
 
-  async function agregar() {
+  function iniciarEdicion(i) {
+    setEditando(i.id)
+    setNombre(i.nombre)
+    setCategoria(i.categoria)
+    setPrecio(i.precio)
+    setCantidad(i.cantidad)
+    setUnidad(i.unidad)
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+  }
+
+  function cancelarEdicion() {
+    setEditando(null)
+    setNombre(''); setPrecio(''); setCantidad(''); setUnidad('g'); setCategoria(CATEGORIAS[0])
+  }
+
+  async function guardar() {
     if (!nombre || !precio || !cantidad) { alert('Completa todos los campos.'); return }
     setSaving(true)
     const ppu = parseFloat(precio) / parseFloat(cantidad)
-    await supabase.from('ingredientes').insert({
-      user_id: user.id, nombre, categoria,
-      precio: parseFloat(precio), cantidad: parseFloat(cantidad),
-      unidad, ppu, currency
-    })
-    setNombre(''); setPrecio(''); setCantidad(''); setUnidad('g')
+    if (editando) {
+      await supabase.from('ingredientes').update({ nombre, categoria, precio: parseFloat(precio), cantidad: parseFloat(cantidad), unidad, ppu, currency }).eq('id', editando)
+    } else {
+      await supabase.from('ingredientes').insert({ user_id: user.id, nombre, categoria, precio: parseFloat(precio), cantidad: parseFloat(cantidad), unidad, ppu, currency })
+    }
+    cancelarEdicion()
     await fetchIngredientes()
     setSaving(false)
   }
@@ -44,6 +60,7 @@ export default function Ingredientes({ currency }) {
   async function eliminar(id) {
     await supabase.from('ingredientes').delete().eq('id', id)
     setIngredientes(prev => prev.filter(i => i.id !== id))
+    if (editando === id) cancelarEdicion()
   }
 
   async function cargarEjemplos() {
@@ -71,19 +88,22 @@ export default function Ingredientes({ currency }) {
         ingredientes.length === 0
           ? <div style={emptyStyle}>Aún no hay ingredientes. Agrega el primero abajo.</div>
           : ingredientes.map(i => (
-            <div key={i.id} style={cardStyle}>
+            <div key={i.id} style={{ ...cardStyle, borderLeft: editando === i.id ? '3px solid #1D9E75' : '1px solid #e5e5e5', borderRadius: editando === i.id ? '0 12px 12px 0' : '12px' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                 <span style={{ flex:1, fontWeight:'500', fontSize:'14px' }}>{i.nombre}</span>
                 <span style={tagStyle}>{i.categoria}</span>
                 <span style={{ fontSize:'12px', color:'#888' }}>{fmt(i.precio, currency)} / {i.cantidad}{i.unidad}</span>
                 <span style={{ fontSize:'12px', color:'#aaa' }}>{fmt(i.ppu, currency)}/{i.unidad}</span>
+                <button onClick={() => iniciarEdicion(i)} style={btnEdit}>editar</button>
                 <button onClick={() => eliminar(i.id)} style={btnDanger}>eliminar</button>
               </div>
             </div>
           ))
       )}
 
-      <p style={{ ...sTitle, marginTop:'1.5rem' }}>Agregar ingrediente</p>
+      <p style={{ ...sTitle, marginTop:'1.5rem' }}>
+        {editando ? 'Editando ingrediente' : 'Agregar ingrediente'}
+      </p>
       <div style={cardStyle}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'10px' }}>
           <div><label style={lbl}>Nombre</label><input style={inp} placeholder="Ej: Harina de trigo" value={nombre} onChange={e => setNombre(e.target.value)} /></div>
@@ -103,8 +123,13 @@ export default function Ingredientes({ currency }) {
           </div>
         </div>
         <div style={{ display:'flex', gap:'8px' }}>
-          <button onClick={agregar} disabled={saving} style={btnPrimary}>{saving ? 'Guardando...' : 'Agregar'}</button>
-          <button onClick={cargarEjemplos} disabled={saving} style={btnGhost}>Cargar ejemplos</button>
+          <button onClick={guardar} disabled={saving} style={btnPrimary}>
+            {saving ? 'Guardando...' : editando ? 'Guardar cambios' : 'Agregar'}
+          </button>
+          {editando
+            ? <button onClick={cancelarEdicion} style={btnGhost}>Cancelar</button>
+            : <button onClick={cargarEjemplos} disabled={saving} style={btnGhost}>Cargar ejemplos</button>
+          }
         </div>
       </div>
     </div>
@@ -120,3 +145,4 @@ const inp = { width:'100%', padding:'8px 10px', fontSize:'13px', border:'1px sol
 const btnPrimary = { padding:'8px 16px', background:'#1D9E75', color:'#fff', border:'none', borderRadius:'8px', fontSize:'13px', fontWeight:'500', cursor:'pointer' }
 const btnGhost = { padding:'8px 16px', background:'transparent', border:'1px solid #e5e5e5', borderRadius:'8px', fontSize:'13px', cursor:'pointer', color:'#1a1a1a' }
 const btnDanger = { fontSize:'12px', padding:'4px 10px', background:'transparent', border:'1px solid #fca5a5', color:'#c0392b', borderRadius:'6px', cursor:'pointer' }
+const btnEdit = { fontSize:'12px', padding:'4px 10px', background:'transparent', border:'1px solid #b5d4f4', color:'#185FA5', borderRadius:'6px', cursor:'pointer' }
